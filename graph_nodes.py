@@ -39,16 +39,16 @@ def input_loader_node(state: AgentState):
         
         ydl_opts = {
             'restrictfilenames': True,
-            # ✨ ULTIMATE FALLBACK: Prioritizes 480p, but ends with /bestvideo+bestaudio/best 
-            # This makes it mathematically impossible to fail format selection unless YouTube returns 0 streams.
-            'format': 'bestvideo[height<=480]+bestaudio/best[height<=480]/bestvideo+bestaudio/best',
+            # We are dropping the complex rules. Just give us the best pre-combined file.
+            'format': 'best', 
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
             'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web'],
+                    # Disguising as iOS or TV bypasses data-center IP blocks much better
+                    'player_client': ['ios', 'tv', 'android', 'web'],
                     'player_js_version': 'actual'
                 }
             }
