@@ -33,12 +33,17 @@ def input_loader_node(state: AgentState):
     
     if "youtube.com" in user_input or "youtu.be" in user_input:
         print("downloading YouTube video")
-        ydl_opts={
+        ydl_opts = {
             'restrictfilenames': True,
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'format': 'best[height<=480]/bestvideo[height<=480]+bestaudio/worst',
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
-            'quiet' : True,
+            'quiet': True,
             'no_warnings': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android'],
+                }
+            }
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(user_input, download=True)
