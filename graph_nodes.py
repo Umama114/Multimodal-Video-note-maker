@@ -41,10 +41,11 @@ def input_loader_node(state: AgentState):
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
-            # 💡 FIX: Match the player client to your desktop browser cookies!
+            'nocache_dir': True, 
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web'], 
+                    'player_client': ['default', 'web_safari'],
+                    'player_js_version': 'actual'
                 }
             }
         }
