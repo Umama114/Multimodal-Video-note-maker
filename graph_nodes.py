@@ -39,14 +39,14 @@ def input_loader_node(state: AgentState):
         
         ydl_opts = {
             'restrictfilenames': True,
-            'format': 'bv*[height<=480]+ba/b[height<=480]',
+            'format_sort': ['res:480', 'ext:mp4:m4a'], 
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
             'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web', 'android'],
+                    'player_client': ['android', 'web'],
                     'player_js_version': 'actual'
                 }
             }
