@@ -49,7 +49,7 @@ def input_loader_node(state: AgentState):
             'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['web', 'tv'],
+                    'player_client': ['web', 'android'],
                     'player_js_version': 'actual'
                 }
             }
