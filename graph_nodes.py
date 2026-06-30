@@ -25,7 +25,7 @@ class AgentState(TypedDict):
     final_notes: str
 
 def input_loader_node(state: AgentState):
-    user_input = state["user_input"]=
+    user_input = state["user_input"]
     download_folder = "downloads"
     os.makedirs(download_folder, exist_ok=True)
 
