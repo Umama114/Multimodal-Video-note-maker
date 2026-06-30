@@ -34,7 +34,7 @@ def input_loader_node(state: AgentState):
         return {"video_path": user_input}
 
     if "youtube.com" in user_input or "youtu.be" in user_input:
-        print("downloading YouTube video with advanced authentication...")
+        print("downloading YouTube video with structural token normalization...")
         
         ydl_opts = {
             'restrictfilenames': True,
@@ -50,22 +50,39 @@ def input_loader_node(state: AgentState):
             },
             'extractor_args': {
                 'youtube': {
+                    'player_client': ['android', 'web_safari'],
                     'player_js_version': 'actual'
                 }
             }
         }
         
         if "YOUTUBE_COOKIES" in st.secrets:
-            print("Processing and cleaning authentication cookies...")
+            print("Repairing cookie alignment (converting spaces back to strict tabs)...")
             raw_cookies = st.secrets["YOUTUBE_COOKIES"]
-            cleaned_cookies = "\n".join([line.lstrip() for line in raw_cookies.splitlines()])
+            reconstructed_lines = []
             
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
-                temp_cookie_file.write(cleaned_cookies)
+            for line in raw_cookies.splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    reconstructed_lines.append(line)
+                    continue
+                
+                columns = stripped.split()
+                if len(columns) >= 7:
+                    domain, domain_flag, path, secure_flag, expiry, name = columns[:6]
+                    value = " ".join(columns[6:])
+                    reconstructed_lines.append(f"{domain}\t{domain_flag}\t{path}\t{secure_flag}\t{expiry}\t{name}\t{value}")
+                else:
+                    reconstructed_lines.append(line)
+                    
+            fixed_cookie_data = "\n".join(reconstructed_lines)
+            
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as temp_cookie_file:
+                temp_cookie_file.write(fixed_cookie_data)
                 cookie_path = temp_cookie_file.name
             ydl_opts['cookiefile'] = cookie_path
         else:
-            print("⚠️ WARNING: YOUTUBE_COOKIES not detected in Streamlit Secrets!")
+            print("⚠️ WARNING: YOUTUBE_COOKIES key missing from Streamlit secrets engine!")
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(user_input, download=True)
