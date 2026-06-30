@@ -39,13 +39,15 @@ def input_loader_node(state: AgentState):
         
         ydl_opts = {
             'restrictfilenames': True,
-            'format_sort': ['res:480', 'ext:mp4:m4a'], 
+            # ✨ FIXED: Added '/best' at the end. If 480p rules fail, it grabs whatever is available.
+            'format': 'bv*[height<=480]+ba/b[height<=480]/best',
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
             'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
+                    # ✨ FIXED: 'android' MUST be first to bypass web format blocks!
                     'player_client': ['android', 'web'],
                     'player_js_version': 'actual'
                 }
@@ -99,7 +101,6 @@ def input_loader_node(state: AgentState):
         return {"video_path": video_path}
 
     raise ValueError("Invalid URL input.")
-
 def extract_audio_node(state: AgentState):
     video_path = state["video_path"]
     audio_path = os.path.splitext(video_path)[0] + ".mp3"
