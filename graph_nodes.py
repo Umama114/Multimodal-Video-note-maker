@@ -34,7 +34,8 @@ def input_loader_node(state: AgentState):
         return {"video_path": user_input}
 
     if "youtube.com" in user_input or "youtu.be" in user_input:
-        print("downloading YouTube video with authentication...")
+        print("downloading YouTube video with advanced authentication...")
+        
         ydl_opts = {
             'restrictfilenames': True,
             'format': 'best[height<=480]/bestvideo[height<=480]+bestaudio/worst',
@@ -42,18 +43,29 @@ def input_loader_node(state: AgentState):
             'quiet': True,
             'no_warnings': True,
             'nocache_dir': True, 
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['default', 'web_safari'],
                     'player_js_version': 'actual'
                 }
             }
         }
+        
         if "YOUTUBE_COOKIES" in st.secrets:
+            print("Processing and cleaning authentication cookies...")
+            raw_cookies = st.secrets["YOUTUBE_COOKIES"]
+            cleaned_cookies = "\n".join([line.lstrip() for line in raw_cookies.splitlines()])
+            
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
-                temp_cookie_file.write(st.secrets["YOUTUBE_COOKIES"])
+                temp_cookie_file.write(cleaned_cookies)
                 cookie_path = temp_cookie_file.name
             ydl_opts['cookiefile'] = cookie_path
+        else:
+            print("⚠️ WARNING: YOUTUBE_COOKIES not detected in Streamlit Secrets!")
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(user_input, download=True)
