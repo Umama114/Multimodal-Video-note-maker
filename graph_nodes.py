@@ -38,12 +38,13 @@ def input_loader_node(state: AgentState):
         ydl_opts = {
             'restrictfilenames': True,
             'format': 'best[height<=480]/bestvideo[height<=480]+bestaudio/worst',
-            'outtmpl': f'{download_folder}/%(title)s.%(ext)s',=
+            'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
+            # 💡 FIX: Match the player client to your desktop browser cookies!
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android'],
+                    'player_client': ['web'], 
                 }
             }
         }
