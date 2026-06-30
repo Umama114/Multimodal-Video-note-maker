@@ -3,6 +3,7 @@ import tempfile
 import streamlit as st
 import subprocess
 import yt_dlp
+from yt_dlp.networking.impersonate import ImpersonateTarget
 from groq import Groq
 from dotenv import load_dotenv
 from typing import TypedDict, Optional
@@ -24,10 +25,6 @@ class AgentState(TypedDict):
     visual_log: str
     final_notes: str
 
-import yt_dlp
-# Import the client target utility for precise network spoofing
-from yt_dlp.networking.impersonate import ImpersonateTarget
-
 def input_loader_node(state: AgentState):
     user_input = state["user_input"]
     download_folder = "downloads"
@@ -42,7 +39,7 @@ def input_loader_node(state: AgentState):
         
         ydl_opts = {
             'restrictfilenames': True,
-            'format': 'best[height<=360]/best[height<=480]/best',
+            'format': 'bv*[height<=480]+ba/b[height<=480]',
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
