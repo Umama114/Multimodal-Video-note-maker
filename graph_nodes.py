@@ -24,6 +24,10 @@ class AgentState(TypedDict):
     visual_log: str
     final_notes: str
 
+import yt_dlp
+# Import the client target utility for precise network spoofing
+from yt_dlp.networking.impersonate import ImpersonateTarget
+
 def input_loader_node(state: AgentState):
     user_input = state["user_input"]
     download_folder = "downloads"
@@ -34,28 +38,30 @@ def input_loader_node(state: AgentState):
         return {"video_path": user_input}
 
     if "youtube.com" in user_input or "youtu.be" in user_input:
-        print("downloading YouTube video with structural token normalization...")
+        print("downloading YouTube video using unfragmented stream routing...")
         
         ydl_opts = {
             'restrictfilenames': True,
-            'format': 'best[height<=480]/bestvideo[height<=480]+bestaudio/worst',
+            'format': 'best[height<=360]/best[height<=480]/best',
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
-            'nocache_dir': True, 
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-            },
+            'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web_safari'],
+                    'player_client': ['web', 'tv'],
                     'player_js_version': 'actual'
                 }
             }
         }
-        
+
+        try:
+            ydl_opts["impersonate"] = ImpersonateTarget.from_str("chrome")
+        except Exception as e:
+            print(f"Impersonation fallback: {e}")
+
+        cookie_path = None
+
         if "YOUTUBE_COOKIES" in st.secrets:
             print("Repairing cookie alignment (converting spaces back to strict tabs)...")
             raw_cookies = st.secrets["YOUTUBE_COOKIES"]
@@ -77,9 +83,11 @@ def input_loader_node(state: AgentState):
                     
             fixed_cookie_data = "\n".join(reconstructed_lines)
             
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as temp_cookie_file:
-                temp_cookie_file.write(fixed_cookie_data)
-                cookie_path = temp_cookie_file.name
+            temp_cookie_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8')
+            temp_cookie_file.write(fixed_cookie_data)
+            temp_cookie_file.close()
+            
+            cookie_path = temp_cookie_file.name
             ydl_opts['cookiefile'] = cookie_path
         else:
             print("⚠️ WARNING: YOUTUBE_COOKIES key missing from Streamlit secrets engine!")
@@ -88,11 +96,12 @@ def input_loader_node(state: AgentState):
             info = ydl.extract_info(user_input, download=True)
             video_path = ydl.prepare_filename(info)
 
-            if "YOUTUBE_COOKIES" in st.secrets and os.path.exists(cookie_path):
-                os.remove(cookie_path)
-            return {"video_path": video_path}
+        if cookie_path and os.path.exists(cookie_path):
+            os.remove(cookie_path)
+            
+        return {"video_path": video_path}
 
-    raise ValueError("Invalid input. Please provide a valid file path or YouTube link.")
+    raise ValueError("Invalid URL input.")
 
 def extract_audio_node(state: AgentState):
     video_path = state["video_path"]
