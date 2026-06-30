@@ -39,7 +39,6 @@ def input_loader_node(state: AgentState):
         
         ydl_opts = {
             'restrictfilenames': True,
-            # We are dropping the complex rules. Just give us the best pre-combined file.
             'format': 'best', 
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
@@ -47,8 +46,9 @@ def input_loader_node(state: AgentState):
             'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
-                    # Disguising as iOS or TV bypasses data-center IP blocks much better
-                    'player_client': ['ios', 'tv', 'android', 'web'],
+                    # ✨ FIXED: Removed 'ios' to stop the DRM trap. 
+                    # Prioritizing 'web_embedded' to bypass data-center blocks cleanly.
+                    'player_client': ['web_embedded', 'android', 'web'],
                     'player_js_version': 'actual'
                 }
             }
