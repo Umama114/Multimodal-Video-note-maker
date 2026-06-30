@@ -39,15 +39,15 @@ def input_loader_node(state: AgentState):
         
         ydl_opts = {
             'restrictfilenames': True,
-            # ✨ FIXED: Added '/best' at the end. If 480p rules fail, it grabs whatever is available.
-            'format': 'bv*[height<=480]+ba/b[height<=480]/best',
+            # ✨ ULTIMATE FALLBACK: Prioritizes 480p, but ends with /bestvideo+bestaudio/best 
+            # This makes it mathematically impossible to fail format selection unless YouTube returns 0 streams.
+            'format': 'bestvideo[height<=480]+bestaudio/best[height<=480]/bestvideo+bestaudio/best',
             'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
             'quiet': True,
             'no_warnings': True,
             'nocache_dir': True,
             'extractor_args': {
                 'youtube': {
-                    # ✨ FIXED: 'android' MUST be first to bypass web format blocks!
                     'player_client': ['android', 'web'],
                     'player_js_version': 'actual'
                 }
