@@ -1,4 +1,6 @@
 import os
+import tempfile
+import streamlit as st
 import subprocess
 import yt_dlp
 from groq import Groq
@@ -23,20 +25,20 @@ class AgentState(TypedDict):
     final_notes: str
 
 def input_loader_node(state: AgentState):
-    user_input = state["user_input"]
+    user_input = state["user_input"]=
     download_folder = "downloads"
     os.makedirs(download_folder, exist_ok=True)
 
     if os.path.exists(user_input):
         print(f"local video detected: {user_input}")
         return {"video_path": user_input}
-    
+
     if "youtube.com" in user_input or "youtu.be" in user_input:
-        print("downloading YouTube video")
+        print("downloading YouTube video with authentication...")
         ydl_opts = {
             'restrictfilenames': True,
             'format': 'best[height<=480]/bestvideo[height<=480]+bestaudio/worst',
-            'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
+            'outtmpl': f'{download_folder}/%(title)s.%(ext)s',=
             'quiet': True,
             'no_warnings': True,
             'extractor_args': {
@@ -45,11 +47,20 @@ def input_loader_node(state: AgentState):
                 }
             }
         }
+        if "YOUTUBE_COOKIES" in st.secrets:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_cookie_file:
+                temp_cookie_file.write(st.secrets["YOUTUBE_COOKIES"])
+                cookie_path = temp_cookie_file.name
+            ydl_opts['cookiefile'] = cookie_path
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(user_input, download=True)
             video_path = ydl.prepare_filename(info)
+
+            if "YOUTUBE_COOKIES" in st.secrets and os.path.exists(cookie_path):
+                os.remove(cookie_path)
             return {"video_path": video_path}
-    
+
     raise ValueError("Invalid input. Please provide a valid file path or YouTube link.")
 
 def extract_audio_node(state: AgentState):
