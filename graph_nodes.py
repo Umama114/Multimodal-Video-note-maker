@@ -1,9 +1,8 @@
 import os
-import tempfile
+import re
+import requests
 import streamlit as st
 import subprocess
-import yt_dlp
-from yt_dlp.networking.impersonate import ImpersonateTarget
 from groq import Groq
 from dotenv import load_dotenv
 from typing import TypedDict, Optional
@@ -12,7 +11,7 @@ import time
 
 load_dotenv()
 
-client= Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 gemini_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -31,76 +30,61 @@ def input_loader_node(state: AgentState):
     os.makedirs(download_folder, exist_ok=True)
 
     if os.path.exists(user_input):
-        print(f"local video detected: {user_input}")
+        print(f"Local video detected: {user_input}")
         return {"video_path": user_input}
 
     if "youtube.com" in user_input or "youtu.be" in user_input:
-        print("downloading YouTube video using unfragmented stream routing...")
+        print("Routing request through RapidAPI Gateway...")
         
-        ydl_opts = {
-            'restrictfilenames': True,
-            'format': 'best', 
-            'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
-            'quiet': True,
-            'no_warnings': True,
-            'nocache_dir': True,
-            'extractor_args': {
-                'youtube': {
-                    # ✨ FIXED: Removed 'ios' to stop the DRM trap. 
-                    # Prioritizing 'web_embedded' to bypass data-center blocks cleanly.
-                    'player_client': ['web_embedded', 'android', 'web'],
-                    'player_js_version': 'actual'
-                }
-            }
+        match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", user_input)
+        if not match:
+            raise ValueError("Could not extract a valid YouTube Video ID from the URL.")
+        video_id = match.group(1)
+        
+        url = "https://youtube-media-downloader.p.rapidapi.com/v2/video/details"
+        querystring = {
+            "videoId": video_id,
+            "urlAccess": "normal",
+            "videos": "auto",
+            "audios": "auto"
         }
-
+        
+        headers = {
+            "x-rapidapi-key": st.secrets["RAPIDAPI_KEY"],
+            "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com"
+        }
+        
         try:
-            ydl_opts["impersonate"] = ImpersonateTarget.from_str("chrome")
-        except Exception as e:
-            print(f"Impersonation fallback: {e}")
-
-        cookie_path = None
-
-        if "YOUTUBE_COOKIES" in st.secrets:
-            print("Repairing cookie alignment (converting spaces back to strict tabs)...")
-            raw_cookies = st.secrets["YOUTUBE_COOKIES"]
-            reconstructed_lines = []
+            response = requests.get(url, headers=headers, params=querystring)
+            response.raise_for_status() 
+            data = response.json()
             
-            for line in raw_cookies.splitlines():
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    reconstructed_lines.append(line)
-                    continue
+            items = data.get("videos", {}).get("items", [])
+            if not items:
+                raise ValueError("No downloadable video formats returned by the API.")
                 
-                columns = stripped.split()
-                if len(columns) >= 7:
-                    domain, domain_flag, path, secure_flag, expiry, name = columns[:6]
-                    value = " ".join(columns[6:])
-                    reconstructed_lines.append(f"{domain}\t{domain_flag}\t{path}\t{secure_flag}\t{expiry}\t{name}\t{value}")
-                else:
-                    reconstructed_lines.append(line)
-                    
-            fixed_cookie_data = "\n".join(reconstructed_lines)
+            download_url = items[0].get("url")
             
-            temp_cookie_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8')
-            temp_cookie_file.write(fixed_cookie_data)
-            temp_cookie_file.close()
+            raw_title = data.get("title", "downloaded_video")
+            safe_title = "".join(c if c.isalnum() else "_" for c in raw_title)
+            video_path = os.path.join(download_folder, f"{safe_title}.mp4")
             
-            cookie_path = temp_cookie_file.name
-            ydl_opts['cookiefile'] = cookie_path
-        else:
-            print("⚠️ WARNING: YOUTUBE_COOKIES key missing from Streamlit secrets engine!")
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(user_input, download=True)
-            video_path = ydl.prepare_filename(info)
-
-        if cookie_path and os.path.exists(cookie_path):
-            os.remove(cookie_path)
+            print(f"Downloading file: {safe_title}...")
+            with requests.get(download_url, stream=True) as video_stream:
+                video_stream.raise_for_status()
+                with open(video_path, 'wb') as f:
+                    for chunk in video_stream.iter_content(chunk_size=8192):
+                        f.write(chunk)
             
-        return {"video_path": video_path}
+            print("✅ Video successfully retrieved!")
+            return {"video_path": video_path}
+            
+        except Exception as e:
+            print(f"❌ RapidAPI extraction failed: {e}")
+            raise e
 
     raise ValueError("Invalid URL input.")
+
 def extract_audio_node(state: AgentState):
     video_path = state["video_path"]
     audio_path = os.path.splitext(video_path)[0] + ".mp3"
