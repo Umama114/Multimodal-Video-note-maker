@@ -1,11 +1,10 @@
 import os
-import re
-import requests
-import streamlit as st
 import subprocess
+import streamlit as st
+import yt_dlp
 from groq import Groq
 from dotenv import load_dotenv
-from typing import TypedDict, Optional
+from typing import TypedDict
 from google import genai
 import time
 
@@ -34,54 +33,35 @@ def input_loader_node(state: AgentState):
         return {"video_path": user_input}
 
     if "youtube.com" in user_input or "youtu.be" in user_input:
-        print("Routing request through RapidAPI Gateway...")
+        print("Downloading YouTube video using optimized yt-dlp...")
         
-        match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11})", user_input)
-        if not match:
-            raise ValueError("Could not extract a valid YouTube Video ID from the URL.")
-        video_id = match.group(1)
-        
-        url = "https://youtube-media-downloader.p.rapidapi.com/v2/video/details"
-        querystring = {
-            "videoId": video_id,
-            "urlAccess": "normal",
-            "videos": "auto",
-            "audios": "auto"
+        ydl_opts = {
+            'restrictfilenames': True,
+            'format': 'best', 
+            'outtmpl': f'{download_folder}/%(title)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+            'nocache_dir': True,
+            'extractor_args': {
+                'youtube': {
+                    # Prioritizing 'web_embedded' to bypass data-center blocks cleanly without cookies.
+                    'player_client': ['web_embedded', 'android', 'web'],
+                    'player_js_version': 'actual'
+                }
+            }
         }
-        
-        headers = {
-            "x-rapidapi-key": st.secrets["RAPIDAPI_KEY"],
-            "x-rapidapi-host": "youtube-media-downloader.p.rapidapi.com"
-        }
-        
+
         try:
-            response = requests.get(url, headers=headers, params=querystring)
-            response.raise_for_status() 
-            data = response.json()
-            
-            items = data.get("videos", {}).get("items", [])
-            if not items:
-                raise ValueError("No downloadable video formats returned by the API.")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(user_input, download=True)
+                video_path = ydl.prepare_filename(info)
                 
-            download_url = items[0].get("url")
-            
-            raw_title = data.get("title", "downloaded_video")
-            safe_title = "".join(c if c.isalnum() else "_" for c in raw_title)
-            video_path = os.path.join(download_folder, f"{safe_title}.mp4")
-            
-            print(f"Downloading file: {safe_title}...")
-            with requests.get(download_url, stream=True) as video_stream:
-                video_stream.raise_for_status()
-                with open(video_path, 'wb') as f:
-                    for chunk in video_stream.iter_content(chunk_size=8192):
-                        f.write(chunk)
-            
             print("✅ Video successfully retrieved!")
             return {"video_path": video_path}
             
         except Exception as e:
-            print(f"❌ RapidAPI extraction failed: {e}")
-            raise e
+            print(f"❌ yt-dlp extraction failed: {e}")
+            raise ValueError(f"Failed to download video: {e}")
 
     raise ValueError("Invalid URL input.")
 
